@@ -1,38 +1,36 @@
-// Vercel Serverless Function
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: 'Use POST' });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'OPENAI_API_KEY missing' });
-
-  let prompt = 'Hallo!';
-  try { prompt = (req.body && req.body.prompt) || 'Hallo!'; } catch {}
+  if (!apiKey) {
+    return res.status(500).json({ error: "OPENAI_API_KEY missing" });
+  }
 
   try {
-    const r = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+    const { messages } = req.body;
+
+    const apiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'Je bent een behulpzame assistent.' },
-          { role: 'user', content: prompt }
-        ]
-      })
+        model: "gpt-3.5-turbo",
+        messages,
+      }),
     });
 
-    const data = await r.json();
-    if (!r.ok) return res.status(500).json({ error: data?.error?.message || 'OpenAI error' });
+    if (!apiRes.ok) {
+      const errorText = await apiRes.text();
+      throw new Error(errorText);
+    }
 
-    const text = data?.choices?.[0]?.message?.content || 'Geen antwoord.';
-    return res.status(200).json({ response: text });
-  } catch (e) {
-    return res.status(500).json({ error: 'Server error' });
+    const data = await apiRes.json();
+    res.status(200).json({ message: data.choices[0].message.content });
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 }
